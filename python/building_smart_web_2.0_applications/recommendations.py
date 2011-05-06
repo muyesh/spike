@@ -49,6 +49,15 @@ def sim_pearson(prefs, p1, p2):
 
   return r
 
+def sim_tanimoto(prefs, p1, p2):
+  intersections=0
+  for item in prefs[p1]:
+    if item in prefs[p2]:
+      intersections+=1.0
+  num=intersections/(len(prefs[p1])+len(prefs[p2])-intersections)
+  return num
+
+
 def topMatches(prefs,p,n=5,similarity=sim_pearson):
   scores=[(similarity(prefs,p,other),other) for other in prefs if other!=p]
   scores.sort()
@@ -84,4 +93,52 @@ def transformPrefs(prefs):
       result[item][person]=prefs[person][item]
   return result
 
+def calculateSimilarItems(prefs, n=10):
+  result={}
 
+  itemPrefs=transformPrefs(prefs)
+  c=0
+  for item in itemPrefs:
+    c+=1
+    if c%100==0: print "%d / %d" % (c,len(itemPrefs))
+
+    scores=topMatches(itemPrefs, item, n=n, similarity=sim_distance)
+    #scores=topMatches(itemPrefs, item, n=n)
+    result[item]=scores
+  return result
+
+
+def getRecommendedItems(prefs, itemMatch, user):
+  userRatings=prefs[user]
+  scores={}
+  totalSim={}
+
+  for (item, rating) in userRatings.items():
+    
+    for (similarity, item2) in itemMatch[item]:
+
+      if item2 in userRatings: continue
+
+      scores.setdefault(item2, 0)
+      scores[item2]+=similarity*rating
+
+      totalSim.setdefault(item2, 0)
+      totalSim[item2]+=similarity
+
+    rankings=[(score/totalSim[item], item) for item,score in scores.items()]
+    rankings.sort()
+    rankings.reverse()
+  return rankings
+
+def loadMovieLens(path='/data/movielens'):
+  movies={}
+  for line in open(path+'/u.item'):
+    (id,title)=line.split('|')[0:2]
+    movies[id]=title
+
+  prefs={}
+  for line in open(path+'/u.data'):
+    (user,movieid,rating,ts)=line.split('\t')
+    prefs.setdefault(user,{})
+    prefs[user][movies[movieid]]=float(rating)
+  return prefs
